@@ -48,12 +48,18 @@
       padding: 0;
     }
 
+    html {
+      height: 100%;
+    }
+
     body {
       font-family: var(--font);
       background: var(--bg);
       color: var(--text);
       line-height: 1.5;
-      min-height: 100vh;
+      height: 100%;
+      overflow: hidden;
+      /* page-level scroll disabled; panels scroll internally */
       -webkit-font-smoothing: antialiased;
     }
 
@@ -75,7 +81,12 @@
       z-index: 1;
       max-width: 960px;
       margin: 0 auto;
-      padding: 28px 20px 32px;
+      padding: 20px 20px 0;
+      /* tab panels handle their own bottom space */
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
 
     .top-grid {
@@ -96,6 +107,8 @@
       align-items: center;
       gap: 16px;
       margin-bottom: 20px;
+      flex-shrink: 0;
+      /* never squish the header */
     }
 
     .logo {
@@ -727,6 +740,435 @@
       color: var(--accent);
     }
 
+    /* ─── Tab navigation ────────────────────────────────────────── */
+    .tab-nav {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 20px;
+      background: var(--surface);
+      padding: 4px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+      /* fixed height — never grows or shrinks */
+    }
+
+    .tab-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 8px 14px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      transition: all var(--transition);
+      letter-spacing: -0.01em;
+      position: relative;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+      background: var(--surface-hover);
+    }
+
+    .tab-btn.active {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .tab-btn .tab-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 18px;
+      height: 18px;
+      padding: 0 5px;
+      border-radius: 100px;
+      background: var(--accent);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1;
+      opacity: 0;
+      transform: scale(0.7);
+      transition: all var(--transition);
+    }
+
+    .tab-btn .tab-badge.visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    .tab-panel {
+      display: none;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* Settings panel: normal vertical scroll */
+    .tab-panel.active#tab-settings {
+      display: block;
+      overflow-y: auto;
+      padding-bottom: 32px;
+    }
+
+    /* Activity panel: flex column, clips overflow so only the log inner scrolls */
+    .tab-panel.active#tab-activity {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ─── Activity log panel ────────────────────────────────────── */
+    .activity-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .activity-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .activity-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .activity-count {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .activity-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .activity-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 5px 10px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 100px;
+    }
+
+    .activity-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .activity-status-dot.live {
+      background: var(--green);
+      box-shadow: 0 0 5px var(--green);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .btn-clear {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      border-radius: var(--radius);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text-secondary);
+      letter-spacing: -0.01em;
+    }
+
+    .btn-clear:hover {
+      background: var(--red-soft);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: var(--red);
+    }
+
+    .activity-log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .activity-log-inner {
+      flex: 1;
+      min-height: 0;
+      /* essential: lets flex child shrink below content size */
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--surface-hover) transparent;
+      padding: 6px;
+    }
+
+    .activity-log-inner::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .activity-log-inner::-webkit-scrollbar-thumb {
+      background: var(--surface-hover);
+      border-radius: 3px;
+    }
+
+    .activity-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 10px;
+      color: var(--text-muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 20px;
+    }
+
+    .activity-empty-icon {
+      font-size: 36px;
+      opacity: 0.4;
+    }
+
+    .activity-empty p {
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* ─── Log entry ─────────────────────────────────────────────── */
+    .log-entry {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      margin-bottom: 3px;
+      transition: background var(--transition);
+      animation: slideIn 0.2s ease-out;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-6px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .log-entry:last-child {
+      margin-bottom: 0;
+    }
+
+    .log-entry:hover {
+      background: var(--surface-hover);
+    }
+
+    .log-icon {
+      font-size: 14px;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 1px;
+      width: 20px;
+      text-align: center;
+    }
+
+    .log-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .log-label {
+      font-size: 12px;
+      color: var(--text);
+      line-height: 1.4;
+      word-break: break-all;
+    }
+
+    .log-ts {
+      font-family: var(--mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    /* per-kind color accent on left border */
+    .log-entry[data-kind="nav"] {
+      border-left: 2px solid var(--blue);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="click"] {
+      border-left: 2px solid var(--yellow);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="type"] {
+      border-left: 2px solid var(--green);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="screenshot"] {
+      border-left: 2px solid var(--accent);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="scan"] {
+      border-left: 2px solid rgba(0, 210, 255, 0.7);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="relay_connect"] {
+      border-left: 2px solid var(--green);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="relay_disconnect"] {
+      border-left: 2px solid var(--red);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="tab_attach"] {
+      border-left: 2px solid rgba(139, 139, 158, 0.4);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="tab_detach"] {
+      border-left: 2px solid rgba(139, 139, 158, 0.2);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="adopt"] {
+      border-left: 2px solid var(--accent);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="cdp"] {
+      border-left: 2px solid rgba(139, 139, 158, 0.3);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="error"] {
+      border-left: 2px solid var(--red);
+      padding-left: 8px;
+    }
+
+    .log-entry[data-kind="tab_attach"],
+    .log-entry[data-kind="tab_detach"],
+    .log-entry[data-kind="cdp"] {
+      opacity: 0.65;
+    }
+
+    .log-entry[data-kind="tab_attach"]:hover,
+    .log-entry[data-kind="tab_detach"]:hover,
+    .log-entry[data-kind="cdp"]:hover {
+      opacity: 1;
+    }
+
+    /* ─── Per-tab subtab bar ─────────────────────────────────────── */
+    .subtab-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 8px 8px 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .subtab-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .subtab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 11px;
+      border-radius: 8px 8px 0 0;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      border-bottom: none;
+      background: transparent;
+      color: var(--text-muted);
+      white-space: nowrap;
+      transition: all var(--transition);
+      letter-spacing: -0.01em;
+      flex-shrink: 0;
+      position: relative;
+      bottom: -1px;
+    }
+
+    .subtab-btn:hover {
+      color: var(--text);
+      background: var(--surface-hover);
+    }
+
+    .subtab-btn.active {
+      color: var(--text);
+      background: var(--surface);
+      border-color: var(--border);
+      border-bottom-color: var(--surface);
+    }
+
+    .subtab-btn .subtab-close {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      font-size: 9px;
+      color: var(--text-muted);
+      background: transparent;
+      transition: all var(--transition);
+      margin-left: 1px;
+      cursor: pointer;
+    }
+
+    .subtab-btn .subtab-close:hover {
+      background: var(--red-soft);
+      color: var(--red);
+    }
+
+    /* Adjust log-inner when subtabs are showing */
+    .activity-log {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .activity-log-inner {
+      flex: 1;
+    }
+
     /* ─── Responsive ────────────────────────────────────────────── */
     @media (max-width: 600px) {
       .top-grid {
@@ -775,160 +1217,226 @@
       <span class="version">v0.1.0</span>
     </div>
 
-    <div class="top-grid">
-      <!-- Live status banner -->
-      <div class="status-banner" id="status-banner" data-state="checking">
-        <div class="status-dot"></div>
+    <!-- Tab Navigation -->
+    <nav class="tab-nav" role="tablist">
+      <button class="tab-btn" id="tab-btn-settings" role="tab" aria-selected="false" aria-controls="tab-settings">
+        <span>⚙️</span> Settings
+      </button>
+      <button class="tab-btn active" id="tab-btn-activity" role="tab" aria-selected="true" aria-controls="tab-activity">
+        <span>⚡</span> Activity Log
+        <span class="tab-badge" id="activity-badge"></span>
+      </button>
+    </nav>
+
+    <!-- Settings Tab Panel -->
+    <div class="tab-panel" id="tab-settings" role="tabpanel" aria-labelledby="tab-btn-settings">
+
+      <div class="top-grid">
+        <!-- Live status banner -->
+        <div class="status-banner" id="status-banner" data-state="checking">
+          <div class="status-dot"></div>
+          <div class="status-info">
+            <div class="status-title" id="status-title">Checking connection…</div>
+            <div class="status-detail" id="status-detail">Attempting to reach the bridge server</div>
+          </div>
+          <button class="status-action" id="btn-recheck">Recheck</button>
+        </div>
+
+        <!-- MCP heartbeat row -->
+        <div class="heartbeat-row" id="heartbeat-row">
+          <div class="heartbeat-dot unknown" id="heartbeat-dot"></div>
+          <span class="heartbeat-label" id="heartbeat-label">MCP heartbeat: not checked yet</span>
+          <span class="heartbeat-latency" id="heartbeat-latency"></span>
+        </div>
+      </div>
+
+      <div class="cards" style="margin-top:12px">
+
+        <!-- Connection settings -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon orange">⚡</div>
+            <div class="card-title">Connection Settings</div>
+          </div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="field">
+                <label for="host">Host</label>
+                <input type="text" id="host" placeholder="127.0.0.1" value="127.0.0.1" />
+              </div>
+              <div class="field">
+                <label for="port">Port</label>
+                <input type="number" id="port" placeholder="18792" />
+              </div>
+              <div class="field">
+                <label for="path">WS Path</label>
+                <input type="text" id="path" placeholder="/extension" value="/extension" />
+              </div>
+            </div>
+
+            <div class="endpoint">
+              <span class="endpoint-label">Endpoint</span>
+              <span class="endpoint-url" id="relay-url">ws://127.0.0.1:18792/extension</span>
+            </div>
+
+            <div class="actions">
+              <button class="btn btn-primary" id="save">Save Settings</button>
+              <button class="btn btn-secondary" id="reset">Reset Defaults</button>
+              <span class="save-status" id="save-status">✓ Saved</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Overlay Settings -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-icon" style="background:rgba(0,210,255,0.12)">🎨</div>
+            <div class="card-title">Overlay Settings</div>
+          </div>
+          <div class="card-body">
+            <p style="margin-bottom:14px">Control which visual overlays appear when the AI scans the page. Adjust
+              opacity
+              to see a live preview.</p>
+
+            <!-- Click box toggle -->
+            <div class="toggle-row" id="row-click">
+              <label class="toggle">
+                <input type="checkbox" id="overlay-click-enabled" checked />
+                <span class="toggle-track"></span>
+              </label>
+              <div class="overlay-preview click-box" id="preview-click">Aa</div>
+              <div class="toggle-label">Click boxes<small>Yellow — buttons, links</small></div>
+              <div class="slider-group">
+                <input type="range" id="overlay-click-opacity" min="10" max="100" value="75" />
+                <span class="slider-value" id="val-click-opacity">75%</span>
+              </div>
+            </div>
+
+            <!-- Type box toggle -->
+            <div class="toggle-row" id="row-type">
+              <label class="toggle">
+                <input type="checkbox" id="overlay-type-enabled" checked />
+                <span class="toggle-track"></span>
+              </label>
+              <div class="overlay-preview type-box" id="preview-type">Aa</div>
+              <div class="toggle-label">Type boxes<small>Green — inputs, textareas</small></div>
+              <div class="slider-group">
+                <input type="range" id="overlay-type-opacity" min="10" max="100" value="75" />
+                <span class="slider-value" id="val-type-opacity">75%</span>
+              </div>
+            </div>
+
+            <!-- Text box toggle -->
+            <div class="toggle-row" id="row-text">
+              <label class="toggle">
+                <input type="checkbox" id="overlay-text-enabled" checked />
+                <span class="toggle-track"></span>
+              </label>
+              <div class="overlay-preview text-box" id="preview-text">Aa</div>
+              <div class="toggle-label">Text boxes<small>Cyan — paragraphs, headings</small></div>
+              <div class="slider-group">
+                <input type="range" id="overlay-text-opacity" min="10" max="100" value="50" />
+                <span class="slider-value" id="val-text-opacity">50%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick start -->
+        <div class="card quick-start">
+          <div class="card-header">
+            <div class="card-icon blue">🚀</div>
+            <div class="card-title">Quick Start</div>
+          </div>
+          <div class="card-body">
+            <div class="steps">
+              <div class="step">
+                <div class="step-num">1</div>
+                <div class="step-content">
+                  Start your MCP server: <code>cd ollama-plugin && npm start</code>
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">2</div>
+                <div class="step-content">
+                  The extension auto-connects. Check the status banner above — it should turn <strong>green</strong>.
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">3</div>
+                <div class="step-content">
+                  Configure your AI agent (Claude, Ollama, etc.) to use the MCP server via <strong>stdio
+                    transport</strong>.
+                </div>
+              </div>
+              <div class="step">
+                <div class="step-num">4</div>
+                <div class="step-content">
+                  To hide the debug banner, launch Chrome with: <code>--silent-debugger-extension-api</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        <span>DOMAgent — Built for AI automation</span>
+        <a href="https://github.com" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+
+    </div><!-- /tab-settings -->
+
+    <!-- Activity Log Tab Panel (default active) -->
+    <div class="tab-panel active" id="tab-activity" role="tabpanel" aria-labelledby="tab-btn-activity">
+
+      <!-- Activity header row -->
+      <div class="activity-header">
+        <div class="activity-header-left">
+          <div class="activity-title">Activity Log</div>
+          <span class="activity-count" id="activity-count">0 events</span>
+        </div>
+        <div class="activity-actions">
+          <button class="btn-clear" id="activity-clear">🗑 Clear</button>
+        </div>
+      </div>
+
+      <!-- Bridge status banner — mirrors the Settings tab banner exactly -->
+      <div class="status-banner" id="activity-bridge-banner" data-state="checking" style="margin-bottom:12px">
+        <div class="status-dot" id="activity-status-dot"></div>
         <div class="status-info">
-          <div class="status-title" id="status-title">Checking connection…</div>
-          <div class="status-detail" id="status-detail">Attempting to reach the bridge server</div>
+          <div class="status-title" id="activity-status-title">Checking connection…</div>
+          <div class="status-detail" id="activity-status-detail">Attempting to reach the bridge server</div>
         </div>
-        <button class="status-action" id="btn-recheck">Recheck</button>
+        <button class="status-action" id="activity-btn-recheck">Recheck</button>
       </div>
 
-      <!-- MCP heartbeat row -->
-      <div class="heartbeat-row" id="heartbeat-row">
-        <div class="heartbeat-dot unknown" id="heartbeat-dot"></div>
-        <span class="heartbeat-label" id="heartbeat-label">MCP heartbeat: not checked yet</span>
-        <span class="heartbeat-latency" id="heartbeat-latency"></span>
-      </div>
-    </div>
 
-    <div class="cards" style="margin-top:12px">
-
-      <!-- Connection settings -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-icon orange">⚡</div>
-          <div class="card-title">Connection Settings</div>
+      <div class="activity-log">
+        <!-- Per-tab sub-tab bar -->
+        <div class="subtab-bar" id="activity-subtabs">
+          <button class="subtab-btn active" data-tabkey="all" id="subtab-all">📊 All</button>
+          <button class="subtab-btn" data-tabkey="system" id="subtab-system">🔧 System</button>
+          <!-- dynamic per-tab buttons injected here by JS -->
         </div>
-        <div class="card-body">
-          <div class="form-grid">
-            <div class="field">
-              <label for="host">Host</label>
-              <input type="text" id="host" placeholder="127.0.0.1" value="127.0.0.1" />
-            </div>
-            <div class="field">
-              <label for="port">Port</label>
-              <input type="number" id="port" placeholder="18792" />
-            </div>
-            <div class="field">
-              <label for="path">WS Path</label>
-              <input type="text" id="path" placeholder="/extension" value="/extension" />
-            </div>
-          </div>
-
-          <div class="endpoint">
-            <span class="endpoint-label">Endpoint</span>
-            <span class="endpoint-url" id="relay-url">ws://127.0.0.1:18792/extension</span>
-          </div>
-
-          <div class="actions">
-            <button class="btn btn-primary" id="save">Save Settings</button>
-            <button class="btn btn-secondary" id="reset">Reset Defaults</button>
-            <span class="save-status" id="save-status">✓ Saved</span>
+        <div class="activity-log-inner" id="activity-log-inner">
+          <div class="activity-empty" id="activity-empty">
+            <div class="activity-empty-icon">🤖</div>
+            <p>No activity yet.<br>Start your MCP server and let an AI agent run an automation — events will appear here
+              in real time.</p>
           </div>
         </div>
       </div>
 
-      <!-- Overlay Settings -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-icon" style="background:rgba(0,210,255,0.12)">🎨</div>
-          <div class="card-title">Overlay Settings</div>
-        </div>
-        <div class="card-body">
-          <p style="margin-bottom:14px">Control which visual overlays appear when the AI scans the page. Adjust opacity
-            to see a live preview.</p>
-
-          <!-- Click box toggle -->
-          <div class="toggle-row" id="row-click">
-            <label class="toggle">
-              <input type="checkbox" id="overlay-click-enabled" checked />
-              <span class="toggle-track"></span>
-            </label>
-            <div class="overlay-preview click-box" id="preview-click">Aa</div>
-            <div class="toggle-label">Click boxes<small>Yellow — buttons, links</small></div>
-            <div class="slider-group">
-              <input type="range" id="overlay-click-opacity" min="10" max="100" value="75" />
-              <span class="slider-value" id="val-click-opacity">75%</span>
-            </div>
-          </div>
-
-          <!-- Type box toggle -->
-          <div class="toggle-row" id="row-type">
-            <label class="toggle">
-              <input type="checkbox" id="overlay-type-enabled" checked />
-              <span class="toggle-track"></span>
-            </label>
-            <div class="overlay-preview type-box" id="preview-type">Aa</div>
-            <div class="toggle-label">Type boxes<small>Green — inputs, textareas</small></div>
-            <div class="slider-group">
-              <input type="range" id="overlay-type-opacity" min="10" max="100" value="75" />
-              <span class="slider-value" id="val-type-opacity">75%</span>
-            </div>
-          </div>
-
-          <!-- Text box toggle -->
-          <div class="toggle-row" id="row-text">
-            <label class="toggle">
-              <input type="checkbox" id="overlay-text-enabled" checked />
-              <span class="toggle-track"></span>
-            </label>
-            <div class="overlay-preview text-box" id="preview-text">Aa</div>
-            <div class="toggle-label">Text boxes<small>Cyan — paragraphs, headings</small></div>
-            <div class="slider-group">
-              <input type="range" id="overlay-text-opacity" min="10" max="100" value="50" />
-              <span class="slider-value" id="val-text-opacity">50%</span>
-            </div>
-          </div>
-        </div>
+      <!-- Footer (mirrored) -->
+      <div class="footer" style="margin-top:16px">
+        <span>Showing last 200 events</span>
+        <span id="activity-footer-ts" style="font-family:var(--mono);font-size:10px"></span>
       </div>
 
-      <!-- Quick start -->
-      <div class="card quick-start">
-        <div class="card-header">
-          <div class="card-icon blue">🚀</div>
-          <div class="card-title">Quick Start</div>
-        </div>
-        <div class="card-body">
-          <div class="steps">
-            <div class="step">
-              <div class="step-num">1</div>
-              <div class="step-content">
-                Start your MCP server: <code>cd ollama-plugin && npm start</code>
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">2</div>
-              <div class="step-content">
-                The extension auto-connects. Check the status banner above — it should turn <strong>green</strong>.
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">3</div>
-              <div class="step-content">
-                Configure your AI agent (Claude, Ollama, etc.) to use the MCP server via <strong>stdio
-                  transport</strong>.
-              </div>
-            </div>
-            <div class="step">
-              <div class="step-num">4</div>
-              <div class="step-content">
-                To hide the debug banner, launch Chrome with: <code>--silent-debugger-extension-api</code>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- Footer -->
-    <div class="footer">
-      <span>DOMAgent — Built for AI automation</span>
-      <a href="https://github.com" target="_blank" rel="noopener">GitHub ↗</a>
-    </div>
+    </div><!-- /tab-activity -->
 
   </div>
 

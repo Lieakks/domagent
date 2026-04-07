@@ -1,5 +1,23 @@
 /* ─── Constants ─────────────────────────────────────────────────── */
 
+/* ─── Activity broadcast ────────────────────────────────────────── */
+/**
+ * Broadcast an activity event to any open options / side-panel page.
+ * @param {'nav'|'tab_attach'|'tab_detach'|'relay_connect'|'relay_disconnect'|
+ *         'cdp'|'screenshot'|'scan'|'click'|'type'|'adopt'|'info'|'error'} kind
+ * @param {string} label  Human-readable short description.
+ * @param {object} [extra]  Optional extra fields.
+ */
+function broadcastActivity(kind, label, extra = {}) {
+  chrome.runtime.sendMessage({
+    type: 'da:activity',
+    kind,
+    label,
+    ts: Date.now(),
+    ...extra,
+  }).catch(() => { /* options page may not be open – ignore */ })
+}
+
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 18792
 const DEFAULT_PATH = '/extension'
@@ -171,6 +189,8 @@ async function ensureRelayConnection() {
       }
     })
 
+    broadcastActivity('relay_connect', `MCP bridge connected at ${wsUrl}`)
+
     ws.onmessage = (event) => void onRelayMessage(String(event.data || ''))
     ws.onclose = () => onRelayClosed('closed')
     ws.onerror = () => onRelayClosed('error')
@@ -191,6 +211,7 @@ async function ensureRelayConnection() {
 
 function onRelayClosed(reason) {
   relayWs = null
+  broadcastActivity('relay_disconnect', `MCP bridge disconnected (${reason})`)
 
   // Reject all pending requests
   for (const [id, p] of pending.entries()) {
@@ -265,7 +286,11 @@ async function maybeOpenHelpOnce() {
     const stored = await chrome.storage.local.get(['helpOnErrorShown'])
     if (stored.helpOnErrorShown === true) return
     await chrome.storage.local.set({ helpOnErrorShown: true })
-    await chrome.runtime.openOptionsPage()
+    // Open the side panel instead of a new tab
+    const [win] = await chrome.windows.getAll({ windowTypes: ['normal'] })
+    if (win?.id) {
+      await chrome.sidePanel.open({ windowId: win.id })
+    }
   } catch { /* ignore */ }
 }
 
@@ -328,6 +353,13 @@ async function attachTab(tabId, opts = {}) {
   tabs.set(tabId, { state: 'connected', sessionId, targetId, attachOrder })
   tabBySession.set(sessionId, tabId)
 
+  // Broadcast attach event (get tab title/url for a friendlier label)
+  chrome.tabs.get(tabId).then((t) => {
+    // Auto-attach tab silently
+  }).catch(() => {
+    // Auto-attach tab silently
+  })
+
   void chrome.action.setTitle({
     tabId,
     title: 'DOMAgent: active (click to disable for this tab)',
@@ -352,6 +384,7 @@ async function attachTab(tabId, opts = {}) {
 }
 
 async function detachTab(tabId, reason) {
+  console.debug(`Tab #${tabId} detached: ${reason || 'unknown'}`)
   const tab = tabs.get(tabId)
 
   // Notify relay of detach
@@ -605,6 +638,8 @@ async function adoptCurrentTabAsAutomation() {
   }
   void persistAutomationTab()
 
+  broadcastActivity('adopt', `Adopted current tab: ${active.title || active.url || `#${tabId}`}`, { tabId, url: active.url, title: active.title })
+
   return {
     tabId,
     targetId: attached.targetId,
@@ -629,12 +664,63 @@ async function handleForwardCdpCommand(msg) {
 
   const tabId = resolveTabForCommand(sessionId, targetId)
 
+  // ── Activity broadcast for well-known MCP tool methods ──
+  // tabId may be null for special commands — that's fine, they go into 'system' in the UI
+  switch (method) {
+    case 'Page.captureScreenshot':
+      broadcastActivity('screenshot', 'Screenshot captured', { tabId })
+      break
+    case 'Runtime.evaluate': {
+      // Detect specific tool signatures from the expression
+      const expr = String(params?.expression || '')
+      if (expr.includes('__da-scan-box') && expr.includes('querySelectorAll') && expr.includes('isVisible')) {
+        broadcastActivity('scan', 'Scanning interactive elements on page', { tabId })
+      } else if (expr.includes('__da-action-hl') && expr.includes('click')) {
+        const selMatch = expr.match(/querySelector\('([^']+)'\)/)
+        broadcastActivity('click', `Clicking: ${selMatch?.[1] || 'element'}`, { tabId, selector: selMatch?.[1] })
+      } else if (expr.includes('__da-action-hl') && expr.includes('focus')) {
+        const selMatch = expr.match(/querySelector\('([^']+)'\)/)
+        broadcastActivity('type', `Typing into: ${selMatch?.[1] || 'input'}`, { tabId, selector: selMatch?.[1] })
+      } else if (expr.includes('innerText') && expr.includes('querySelector')) {
+        const selMatch = expr.match(/querySelector\('([^']+)'\)/)
+        broadcastActivity('cdp', `Reading text from: ${selMatch?.[1] || 'element'}`, { tabId })
+      } else if (expr.includes('__da-scan-box') && expr.includes('remove')) {
+        broadcastActivity('cdp', 'Clearing visual overlays', { tabId })
+      } else if (expr.trim().length > 0) {
+        const preview = expr.trim().substring(0, 60).replace(/\n/g, ' ')
+        broadcastActivity('cdp', `Evaluating: ${preview}${expr.length > 60 ? '…' : ''}`, { tabId })
+      }
+      break
+    }
+    case 'Browser.getOverlaySettings':
+      // silent – too noisy
+      break
+    case 'Target.createTarget':
+      broadcastActivity('nav', `Opening new tab: ${params?.url || 'about:blank'}`, { url: params?.url })
+      break
+    case 'Target.closeTarget':
+      broadcastActivity('cdp', `Closing tab (targetId: ${params?.targetId || 'current'})`, { tabId })
+      break
+    case 'Target.activateTarget':
+      broadcastActivity('cdp', `Focusing tab (targetId: ${params?.targetId || 'current'})`, { tabId })
+      break
+    case 'Page.navigate':
+      broadcastActivity('nav', `Page.navigate → ${params?.url || '?'}`, { tabId, url: params?.url })
+      break
+    default:
+      if (method) {
+        broadcastActivity('cdp', `CDP: ${method}`, { tabId, method })
+      }
+  }
+
   // ── Special commands (don't require pre-existing tab) ──
 
   if (method === 'Browser.ensureTab') {
     const url = typeof params?.url === 'string' ? params.url : ''
     if (!url) throw new Error('URL required')
     const result = await ensureAutomationTab(url)
+    // Broadcast nav now that we have the real tabId
+    broadcastActivity('nav', `Navigating to ${url}`, { tabId: result.tabId, url })
     return { targetId: result.targetId, sessionId: result.sessionId }
   }
 
@@ -752,7 +838,10 @@ function onDebuggerDetach(source, reason) {
 
 /* ─── Event listeners ───────────────────────────────────────────── */
 
-chrome.action.onClicked.addListener(() => void connectOrToggleForActiveTab())
+// Configure action click to open the side panel (Chrome Side Panel API)
+chrome.sidePanel
+  .setPanelBehavior({ openPanelOnActionClick: true })
+  .catch((err) => console.error('sidePanel.setPanelBehavior error:', err))
 
 chrome.tabs.onCreated.addListener((tab) => {
   if (tab.id) void autoAttachTab(tab.id)
@@ -762,8 +851,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (changeInfo.status === 'loading') void autoAttachTab(tabId)
 })
 
-chrome.runtime.onInstalled.addListener(() => {
-  void chrome.runtime.openOptionsPage()
+chrome.runtime.onInstalled.addListener(async () => {
+  // Open the side panel on first install instead of a new tab
+  try {
+    const [win] = await chrome.windows.getAll({ windowTypes: ['normal'] })
+    if (win?.id) {
+      await chrome.sidePanel.open({ windowId: win.id })
+    }
+  } catch { /* ignore */ }
 })
 
 /* ─── Startup scan & periodic retry ─────────────────────────────── */

@@ -12,6 +12,24 @@
 
 /* ─── Constants ──────────────────────────────────────────────────── */
 
+/* ─── Activity broadcast ────────────────────────────────────────── */
+/**
+ * Broadcast an activity event to any open options / sidebar page.
+ * @param {'nav'|'tab_attach'|'tab_detach'|'relay_connect'|'relay_disconnect'|
+ *         'cdp'|'screenshot'|'scan'|'click'|'type'|'adopt'|'info'|'error'} kind
+ * @param {string} label  Human-readable short description.
+ * @param {object} [extra]  Optional extra fields.
+ */
+function broadcastActivity(kind, label, extra = {}) {
+  api.runtime.sendMessage({
+    type: 'da:activity',
+    kind,
+    label,
+    ts: Date.now(),
+    ...extra,
+  }).catch(() => { /* options page may not be open – ignore */ })
+}
+
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 18792
 const DEFAULT_PATH = '/extension'
@@ -124,6 +142,8 @@ async function ensureRelayConnection() {
       ws.onclose = (ev) => { clearTimeout(t); reject(new Error(`WebSocket closed (${ev.code})`)) }
     })
 
+    broadcastActivity('relay_connect', `MCP bridge connected at ${wsUrl}`)
+
     ws.onmessage = (event) => void onRelayMessage(String(event.data || ''))
     ws.onclose = () => onRelayClosed('closed')
     ws.onerror = () => onRelayClosed('error')
@@ -138,6 +158,7 @@ async function ensureRelayConnection() {
 
 function onRelayClosed(reason) {
   relayWs = null
+  broadcastActivity('relay_disconnect', `MCP bridge disconnected (${reason})`)
 
   for (const [id, p] of pending.entries()) {
     pending.delete(id)
@@ -196,7 +217,8 @@ async function maybeOpenHelpOnce() {
     const stored = await api.storage.local.get(['helpOnErrorShown'])
     if (stored.helpOnErrorShown === true) return
     await api.storage.local.set({ helpOnErrorShown: true })
-    await api.runtime.openOptionsPage()
+    // Open the sidebar instead of a new tab (Firefox sidebarAction API)
+    await browser.sidebarAction.open()
   } catch { /* ignore */ }
 }
 
@@ -235,6 +257,8 @@ async function attachTab(tabId, opts = {}) {
   tabs.set(tabId, { state: 'connected', sessionId, targetId, attachOrder })
   tabBySession.set(sessionId, tabId)
 
+  // Silently attach tab
+
   void api.action.setTitle({ tabId, title: 'DOMAgent: active (click to disable for this tab)' }).catch(() => { })
 
   if (!opts.skipAttachedEvent) {
@@ -258,6 +282,7 @@ async function attachTab(tabId, opts = {}) {
 }
 
 async function detachTab(tabId, reason) {
+  console.debug(`Tab #${tabId} detached: ${reason || 'unknown'}`)
   const tab = tabs.get(tabId)
 
   if (tab?.sessionId && tab?.targetId) {
@@ -414,6 +439,8 @@ async function adoptCurrentTabAsAutomation() {
   automationTab = { tabId, sessionId: attached.sessionId, targetId: attached.targetId }
   void persistAutomationTab()
 
+  broadcastActivity('adopt', `Adopted current tab: ${active.title || active.url || `#${tabId}`}`, { tabId, url: active.url, title: active.title })
+
   return { tabId, targetId: attached.targetId, sessionId: attached.sessionId, url: active.url || '', title: active.title || '' }
 }
 
@@ -423,20 +450,21 @@ async function adoptCurrentTabAsAutomation() {
  * Send a command to the content script in the given tab and await response.
  * The content script (content.js) executes the action in page context and
  * returns the result or throws an error.
+ *
+ * Firefox browser.tabs.sendMessage() returns a Promise (NOT callback-based
+ * like Chrome). The content script returns its result via sendResponse(),
+ * and Firefox resolves the promise with that value.
  */
 async function sendToContentScript(tabId, command) {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error(`Content script timeout for: ${command.method}`)), 15000)
-    api.tabs.sendMessage(tabId, command, (response) => {
-      clearTimeout(timeout)
-      if (api.runtime.lastError) {
-        reject(new Error(`Content script error: ${api.runtime.lastError.message}`))
-        return
-      }
-      if (response?.error) reject(new Error(response.error))
-      else resolve(response?.result)
-    })
-  })
+  const timeoutMs = 15000
+  const response = await Promise.race([
+    api.tabs.sendMessage(tabId, command),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Content script timeout for: ${command.method}`)), timeoutMs)
+    ),
+  ])
+  if (response?.error) throw new Error(response.error)
+  return response?.result
 }
 
 /* ─── Command handler ────────────────────────────────────────────── */
@@ -450,12 +478,60 @@ async function handleCommand(msg) {
 
   const tabId = resolveTabForCommand(sessionId)
 
+  /* ── Activity broadcast for well-known MCP tool methods ── */
+  switch (method) {
+    case 'Page.captureScreenshot':
+      broadcastActivity('screenshot', 'Screenshot captured', { tabId })
+      break
+    case 'Runtime.evaluate': {
+      const expr = String(params?.expression || '')
+      if (expr.includes('__da-scan-box') && expr.includes('querySelectorAll') && expr.includes('isVisible')) {
+        broadcastActivity('scan', 'Scanning interactive elements on page', { tabId })
+      } else if (expr.includes('__da-action-hl') && expr.includes('click')) {
+        const selMatch = expr.match(/querySelector\('([^']+)'\)/)
+        broadcastActivity('click', `Clicking: ${selMatch?.[1] || 'element'}`, { tabId, selector: selMatch?.[1] })
+      } else if (expr.includes('__da-action-hl') && expr.includes('focus')) {
+        const selMatch = expr.match(/querySelector\('([^']+)'\)/)
+        broadcastActivity('type', `Typing into: ${selMatch?.[1] || 'input'}`, { tabId, selector: selMatch?.[1] })
+      } else if (expr.includes('innerText') && expr.includes('querySelector')) {
+        const selMatch = expr.match(/querySelector\('([^']+)'\)/)
+        broadcastActivity('cdp', `Reading text from: ${selMatch?.[1] || 'element'}`, { tabId })
+      } else if (expr.includes('__da-scan-box') && expr.includes('remove')) {
+        broadcastActivity('cdp', 'Clearing visual overlays', { tabId })
+      } else if (expr.trim().length > 0) {
+        const preview = expr.trim().substring(0, 60).replace(/\n/g, ' ')
+        broadcastActivity('cdp', `Evaluating: ${preview}${expr.length > 60 ? '...' : ''}`, { tabId })
+      }
+      break
+    }
+    case 'Browser.getOverlaySettings':
+      // silent – too noisy
+      break
+    case 'Target.createTarget':
+      broadcastActivity('nav', `Opening new tab: ${params?.url || 'about:blank'}`, { url: params?.url })
+      break
+    case 'Target.closeTarget':
+      broadcastActivity('cdp', `Closing tab (targetId: ${params?.targetId || 'current'})`, { tabId })
+      break
+    case 'Target.activateTarget':
+      broadcastActivity('cdp', `Focusing tab (targetId: ${params?.targetId || 'current'})`, { tabId })
+      break
+    case 'Page.navigate':
+      broadcastActivity('nav', `Page.navigate -> ${params?.url || '?'}`, { tabId, url: params?.url })
+      break
+    default:
+      if (method) {
+        broadcastActivity('cdp', `CDP: ${method}`, { tabId, method })
+      }
+  }
+
   /* ── Special commands ── */
 
   if (method === 'Browser.ensureTab') {
     const url = typeof params?.url === 'string' ? params.url : ''
     if (!url) throw new Error('URL required')
     const result = await ensureAutomationTab(url)
+    broadcastActivity('nav', `Navigating to ${url}`, { tabId: result.tabId, url })
     return { targetId: result.targetId, sessionId: result.sessionId }
   }
 
@@ -505,7 +581,11 @@ async function handleCommand(msg) {
 
 /* ─── Event listeners ────────────────────────────────────────────── */
 
-api.action.onClicked.addListener(() => void connectOrToggleForActiveTab())
+// Toolbar icon click: toggle the sidebar open/closed (Firefox sidebarAction API).
+// sidebarAction.toggle() must be called from a user gesture (action.onClicked).
+api.action.onClicked.addListener(() => {
+  void browser.sidebarAction.toggle()
+})
 
 api.tabs.onCreated.addListener((tab) => {
   if (tab.id) void autoAttachTab(tab.id)
@@ -519,9 +599,8 @@ api.tabs.onRemoved.addListener((tabId) => {
   if (tabs.has(tabId)) void detachTab(tabId, 'tab_closed')
 })
 
-api.runtime.onInstalled.addListener(() => {
-  void api.runtime.openOptionsPage()
-})
+// open_at_install: true in manifest.json handles first-install sidebar opening natively.
+api.runtime.onInstalled.addListener(() => { /* sidebar opens via open_at_install */ })
 
 /* ─── Startup scan & periodic retry ─────────────────────────────── */
 

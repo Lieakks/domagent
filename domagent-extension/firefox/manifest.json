@@ -6,7 +6,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "domagent@local",
-      "strict_min_version": "109.0"
+      "strict_min_version": "115.0"
     }
   },
   "icons": {
@@ -34,13 +34,24 @@
     ]
   },
   "action": {
-    "default_title": "DOMAgent (ON by default - click to disable for this tab)",
+    "default_title": "DOMAgent - Toggle Settings Sidebar",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
+  },
+  "sidebar_action": {
+    "default_title": "DOMAgent Settings",
+    "default_panel": "options.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "open_at_install": true
   },
   "content_scripts": [
     {
@@ -56,6 +67,6 @@
   ],
   "options_ui": {
     "page": "options.html",
-    "open_in_tab": true
+    "open_in_tab": false
   }
 }

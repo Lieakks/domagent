@@ -13,7 +13,8 @@
     "debugger",
     "tabs",
     "activeTab",
-    "storage"
+    "storage",
+    "sidePanel"
   ],
   "host_permissions": [
     "http://127.0.0.1/*",
@@ -23,7 +24,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "DOMAgent (ON by default - click to disable for this tab)",
+    "default_title": "DOMAgent - Open Settings Panel",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -31,8 +32,11 @@
       "128": "icons/icon128.png"
     }
   },
+  "side_panel": {
+    "default_path": "options.html"
+  },
   "options_ui": {
     "page": "options.html",
-    "open_in_tab": true
+    "open_in_tab": false
   }
 }
