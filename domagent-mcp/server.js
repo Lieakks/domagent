@@ -14,6 +14,7 @@ export class BridgeServer {
     this.authenticated = false;
     this.authTimer = null;
     this.pendingRequests = new Map();
+    this.maxPending = 10;
     this.nextId = 1;
     this.activeSessionId = null;
   }
@@ -53,6 +54,10 @@ export class BridgeServer {
 
         ws.on('close', () => {
           clearTimeout(this.authTimer);
+          for (const [id, p] of this.pendingRequests) {
+            p.reject(new Error('Extension disconnected'));
+          }
+          this.pendingRequests.clear();
           console.error('Extension disconnected');
           if (this.activeConnection === ws) {
             this.activeConnection = null;
@@ -123,6 +128,9 @@ export class BridgeServer {
   async sendCommand(method, params = {}) {
     if (!this.activeConnection) throw new Error('Extension not connected');
     if (!this.authenticated) throw new Error('Extension not authenticated');
+    if (this.pendingRequests.size >= this.maxPending) {
+      throw new Error(`Too many pending requests (${this.maxPending} max). Wait for previous commands to complete.`);
+    }
 
     const id = this.nextId++;
     const cmdParams = { method, params };

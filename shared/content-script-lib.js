@@ -60,8 +60,18 @@ function domAgentClearOverlays() {
 }
 
 function domAgentEvaluate(expression) {
+  let fn;
   try {
-    const result = new Function(`return (${expression})`)();
+    fn = new Function(`return (${expression})`);
+  } catch (e) {
+    if (e instanceof EvalError || String(e.message || '').toLowerCase().includes('eval')) {
+      throw new Error('evaluate_script blocked: page CSP prohibits eval (Firefox limitation). Use other tools instead.');
+    }
+    throw new Error(String(e?.message || e));
+  }
+
+  try {
+    const result = fn();
     if (result instanceof Promise) {
       return result
         .then(v => ({ value: typeof v === 'object' ? JSON.stringify(v) : String(v ?? '') }))
