@@ -432,7 +432,7 @@ async function autoAttachTab(tabId) {
   if (manuallyDetached.has(tabId)) return
   const tab = await chrome.tabs.get(tabId).catch(() => null)
   if (!isTabEligible(tab)) return
-  if (tabs.get(tabId)?.state === 'connected') return
+  if (tabs.get(tabId)?.state === 'connected' && relayWs?.readyState === WebSocket.OPEN) return
 
   try {
     await ensureRelayConnection().catch(() => { })
@@ -448,7 +448,7 @@ async function connectOrToggleForActiveTab() {
   const tabId = active?.id
   if (!tabId) return
 
-  if (tabs.get(tabId)?.state === 'connected') {
+  if (tabs.get(tabId)?.state === 'connected' && relayWs && relayWs.readyState === WebSocket.OPEN) {
     manuallyDetached.add(tabId)
     await detachTab(tabId, 'toggle')
     return
