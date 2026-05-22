@@ -7,13 +7,25 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { BridgeServer } from './server.js';
 
+/* ─── Auth token ─────────────────────────────────────────────────── */
+
+const tokenIndex = process.argv.indexOf('--token');
+const cliToken = tokenIndex !== -1 ? process.argv[tokenIndex + 1] : null;
+const token = process.env.DOMAGENT_TOKEN || cliToken || null;
+
 /* ─── Initialize servers ────────────────────────────────────────── */
 
-const bridgeServer = new BridgeServer();
+const bridgeServer = new BridgeServer(18792, '/extension', token);
 bridgeServer.start().catch((err) => {
     console.error("Failed to start Bridge Server:", err);
     process.exit(1);
 });
+
+if (token) {
+    console.error('DOMAgent: auth token configured — extension must provide matching token');
+} else {
+    console.error('DOMAgent: no auth token set — any local extension can connect');
+}
 
 const server = new Server(
     { name: "domagent-mcp", version: "1.0.0" },

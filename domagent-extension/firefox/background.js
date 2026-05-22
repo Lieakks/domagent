@@ -73,13 +73,14 @@ async function restoreAutomationTab() {
 /* ─── Settings ───────────────────────────────────────────────────── */
 
 async function getRelaySettings() {
-  const stored = await api.storage.local.get(['host', 'port', 'path'])
+  const stored = await api.storage.local.get(['host', 'port', 'path', 'auth_token'])
   let port = Number.parseInt(String(stored.port || ''), 10)
   if (!Number.isFinite(port) || port <= 0 || port > 65535) port = DEFAULT_PORT
   return {
     host: stored.host || DEFAULT_HOST,
     port,
     path: stored.path || DEFAULT_PATH,
+    authToken: stored.auth_token || null,
   }
 }
 
@@ -117,6 +118,37 @@ async function ensureRelayConnection() {
       ws.onopen = () => { clearTimeout(t); resolve() }
       ws.onerror = () => { clearTimeout(t); reject(new Error('WebSocket connect failed')) }
       ws.onclose = (ev) => { clearTimeout(t); reject(new Error(`WebSocket closed (${ev.code})`)) }
+    })
+
+    await new Promise((resolve, reject) => {
+      const authTimeout = setTimeout(() => {
+        reject(new Error('Auth handshake timeout'))
+      }, 5000)
+
+      ws.onmessage = (event) => {
+        let msg
+        try { msg = JSON.parse(String(event.data || '')) } catch { return }
+
+        if (msg.method === 'hello') {
+          if (msg.tokenRequired && settings.authToken) {
+            ws.send(JSON.stringify({ method: 'auth', token: settings.authToken }))
+          } else {
+            ws.send(JSON.stringify({ method: 'auth' }))
+          }
+          return
+        }
+
+        if (msg.result === 'authenticated') {
+          clearTimeout(authTimeout)
+          resolve()
+          return
+        }
+
+        reject(new Error('Auth failed: unexpected response'))
+      }
+
+      ws.onerror = () => { clearTimeout(authTimeout); reject(new Error('Auth error')) }
+      ws.onclose = (ev) => { clearTimeout(authTimeout); reject(new Error(`Auth closed (${ev.code})`)) }
     })
 
     ws.onmessage = (event) => void onRelayMessage(String(event.data || ''))

@@ -4,12 +4,15 @@ import { escapeJS } from '../shared/utils.js';
 import { OVERLAY_CSS } from '../shared/overlay-styles.js';
 
 export class BridgeServer {
-  constructor(port = 18792, path = '/extension') {
+  constructor(port = 18792, path = '/extension', token = null) {
     this.port = port;
     this.path = path;
+    this.token = token;
     this.wss = null;
     this.httpServer = null;
     this.activeConnection = null;
+    this.authenticated = false;
+    this.authTimer = null;
     this.pendingRequests = new Map();
     this.nextId = 1;
     this.activeSessionId = null;
@@ -32,18 +35,30 @@ export class BridgeServer {
       this.wss.on('connection', (ws, req) => {
         if (req.url !== this.path) { ws.close(); return; }
 
-        console.error('Extension connected');
+        console.error('Extension connected, starting auth...');
+        this.authenticated = false;
         this.activeConnection = ws;
 
+        ws.send(JSON.stringify({ method: 'hello', tokenRequired: !!this.token }));
+
+        this.authTimer = setTimeout(() => {
+          console.error('Auth timeout — disconnecting');
+          ws.close(4001, 'auth timeout');
+        }, 5000);
+
         ws.on('message', (raw) => {
-          try { this.handleMessage(JSON.parse(raw)); }
+          try { this.handleMessage(JSON.parse(raw), ws); }
           catch (e) { console.error('Parse error:', e); }
         });
 
         ws.on('close', () => {
+          clearTimeout(this.authTimer);
           console.error('Extension disconnected');
-          this.activeConnection = null;
-          this.activeSessionId = null;
+          if (this.activeConnection === ws) {
+            this.activeConnection = null;
+            this.authenticated = false;
+            this.activeSessionId = null;
+          }
         });
 
         ws.on('error', (err) => console.error('WS error:', err));
@@ -56,8 +71,15 @@ export class BridgeServer {
     });
   }
 
-  handleMessage(data) {
+  handleMessage(data, ws) {
     if (data.method === 'ping') { this.send({ method: 'pong' }); return; }
+
+    if (data.method === 'auth') {
+      this._handleAuth(data.token, ws);
+      return;
+    }
+
+    if (!this.authenticated) return;
 
     if (data.id && (data.result !== undefined || data.error !== undefined)) {
       const p = this.pendingRequests.get(data.id);
@@ -68,15 +90,39 @@ export class BridgeServer {
     }
   }
 
+  _handleAuth(token, ws) {
+    if (!this.token) {
+      this.authenticated = true;
+      clearTimeout(this.authTimer);
+      console.error('Extension authenticated (no token required)');
+      ws.send(JSON.stringify({ result: 'authenticated' }));
+      return;
+    }
+
+    if (token === this.token) {
+      this.authenticated = true;
+      clearTimeout(this.authTimer);
+      console.error('Extension authenticated');
+      ws.send(JSON.stringify({ result: 'authenticated' }));
+    } else {
+      console.error('Auth failed — closing');
+      ws.close(4002, 'auth failed');
+    }
+  }
+
   send(payload) {
     if (!this.activeConnection || this.activeConnection.readyState !== 1) {
       throw new Error('Extension not connected');
+    }
+    if (!this.authenticated) {
+      throw new Error('Extension not authenticated');
     }
     this.activeConnection.send(JSON.stringify(payload));
   }
 
   async sendCommand(method, params = {}) {
     if (!this.activeConnection) throw new Error('Extension not connected');
+    if (!this.authenticated) throw new Error('Extension not authenticated');
 
     const id = this.nextId++;
     const cmdParams = { method, params };
