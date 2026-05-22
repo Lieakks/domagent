@@ -1,0 +1,89 @@
+# Publish to npm — MANUAL RE-PUBLISH FALLBACK
+#
+# Automatic publishing is handled as Job 3 inside auto-release.yml.
+# GitHub Actions does NOT fire release:created events from releases
+# created by another workflow using GITHUB_TOKEN, so a standalone
+# workflow triggered on release:created would never run automatically.
+#
+# Use this workflow ONLY for:
+#   - Re-publishing a version if the publish job in auto-release failed
+#   - Publishing to npm manually for a specific tag
+#
+# Trigger: manual only (Actions tab → "Publish to npm" → Run workflow)
+#
+# Required repository secret:
+#   NPM_TOKEN — Automation token from https://www.npmjs.com/settings/<username>/tokens
+
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v1.0.5)'
+        required: true
+        type: string
+
+jobs:
+  npm-publish:
+    name: Publish domagent to npm
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read  # only needs to read the repo
+      id-token: write # Required for Trusted Publishing (OIDC) and --provenance
+
+    steps:
+      # ── 1. Checkout the exact release tag ─────────────────────────
+      # The tag was created by auto-release.yml on the version-bump commit,
+      # so package.json at this ref already has the correct bumped version.
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      # ── 2. Set up Node.js with npm registry auth ──────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # ── 3. Extract version from release tag ───────────────────────
+      - name: Get version from tag
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "Publishing version: ${VERSION}"
+
+      # ── 4. Verify package.json version matches the release tag ────
+      - name: Verify version consistency
+        run: |
+          PKG_VERSION=$(node -p "require('./domagent-mcp/package.json').version")
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          echo "package.json version: ${PKG_VERSION}"
+          echo "Release tag version:  ${TAG_VERSION}"
+          if [ "${PKG_VERSION}" != "${TAG_VERSION}" ]; then
+            echo "ERROR: Version mismatch — package.json has ${PKG_VERSION} but tag is v${TAG_VERSION}"
+            exit 1
+          fi
+
+      # ── 5. Install dependencies ───────────────────────────────────
+      - name: Install dependencies
+        run: |
+          cd domagent-mcp
+          npm ci --ignore-scripts
+
+      # ── 6. Publish to npm ─────────────────────────────────────────
+      #   --access public  required for scoped packages; harmless for unscoped
+      #   NODE_AUTH_TOKEN  set from the NPM_TOKEN repository secret
+      - name: Publish to npm
+        run: |
+          cd domagent-mcp
+          echo "Publishing domagent@${{ steps.version.outputs.version }} to npm..."
+          npm publish --access public --provenance
+          echo "Published: https://www.npmjs.com/package/domagent"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
