@@ -1,31 +1,31 @@
-Flygent v0.2.0 — Architecture & Implementation
-=================================================
+Flygent v0.2.0 — 架构设计与实现原理
+========================================
 
-> DOMAgent fork — refactored, security-hardened browser agent extension.
-> Based on vaishnavucv/domagent v1.0.11. Works with Chrome (CDP) and Firefox (content script relay).
+> DOMAgent fork — 重构并加固安全的浏览器 agent 扩展。
+> 基于 vaishnavucv/domagent v1.0.11。支持 Chrome（CDP）和 Firefox（content script relay）。
 
 --------------------------------------------------------------------
-Architecture Overview
+架构总览
 --------------------------------------------------------------------
 
                         ┌───────────────────────┐
                         │     AI Agent           │  Claude Desktop
-                        │  (any MCP client)       │  Cursor, Ollama
+                        │  (任意 MCP 客户端)       │  Cursor, Ollama
                         │                        │  OpenCode...
                         └───────────┬───────────┘
-                                    │  stdio (MCP protocol)
+                                    │  stdio（MCP 协议）
                                     │  JSON-RPC: ListTools / CallTool
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                    domagent-mcp (Node.js)                          │
+│                    domagent-mcp（Node.js）                          │
 │                                                                    │
 │  ┌──────────────┐      ┌──────────────────────────────────────┐  │
-│  │  index.js     │      │  server.js (BridgeServer)             │  │
+│  │  index.js     │      │  server.js（BridgeServer）            │  │
 │  │               │      │                                      │  │
-│  │ . 9 tools     │─────→│  . WebSocket server :18792           │  │
-│  │ . stdio       │      │  . auth handshake (token)            │  │
-│  │ . token       │      │  . rate limit: 10 concurrent         │  │
-│  │               │      │  . CDP command relay                 │  │
+│  │ · 注册9个工具  │─────→│  · WebSocket 服务器 :18792           │  │
+│  │ · stdio 传输   │      │  · 认证握手（token）                 │  │
+│  │ · token 注入   │      │  · 并发上限 10（速率限制）           │  │
+│  │               │      │  · CDP 命令中继                      │  │
 │  └──────────────┘      └──────────────┬───────────────────────┘  │
 │                                       │                           │
 │                                       │ import                    │
@@ -37,25 +37,25 @@ Architecture Overview
 └───────────────────────────────────────────────────────────────────┘
                                     │
                                     │  WebSocket ws://127.0.0.1:18792
-                                    │  ┌─── auth handshake ───┐
-                                    │  │ hello -> auth -> ok  │
-                                    │  └──────────────────────┘
+                                    │  ┌─── 认证握手 ───┐
+                                    │  │ hello → auth → ✓ │
+                                    │  └──────────────────┘
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│              Browser Extension (MV3)                               │
+│              浏览器扩展（MV3）                                      │
 │                                                                    │
 │  ┌─────────────────────────┐    ┌─────────────────────────────┐  │
 │  │  Chrome                  │    │  Firefox                     │  │
 │  │  background.js           │    │  background.js               │  │
-│  │  (Service Worker)        │    │  (Persistent Background)     │  │
+│  │  （Service Worker）       │    │  （持久后台脚本）              │  │
 │  │                          │    │                              │  │
 │  │  importScripts ──────────┼────┼── manifest scripts ─────────┤  │
-│  │       |                  │    │       |                      │  │
+│  │       ↓                  │    │       ↓                      │  │
 │  │  shared/background-lib   │    │  shared/background-lib       │  │
 │  │                          │    │                              │  │
 │  │  chrome.debugger API ────┤    │  tabs.sendMessage ──────────→│  │
-│  │       | (CDP)            │    │       |                      │  │
-│  │  direct protocol access  │    │  content.js ──> shared/     │  │
+│  │       ↓（CDP）            │    │       ↓                      │  │
+│  │  直接操控浏览器协议层      │    │  content.js ──→ shared/     │  │
 │  │                          │    │              content-script-  │  │
 │  │                          │    │              lib.js           │  │
 │  └──────────────────────────┘    └─────────────────────────────┘  │
@@ -63,67 +63,67 @@ Architecture Overview
                                     │
                                     ▼
 ┌───────────────────────────────────────────────────────────────────┐
-│                Real Browser (your tabs)                            │
+│                    真实浏览器（你的标签页）                           │
 │                                                                    │
-│   Blue dot = type      Orange dot = click                         │
-│   Green dashed = input  Yellow dashed = button/link               │
-│   Cyan solid = text     Red badge = element index                 │
+│   🔵 蓝色圆点 = 输入       🟠 橙色圆点 = 点击                      │
+│   🟢 绿色虚线框 = 输入框    🟡 黄色虚线框 = 按钮/链接               │
+│   🔷 青色实线框 = 文本      🔴 红色角标 = 元素编号                  │
 └───────────────────────────────────────────────────────────────────┘
 
 
 --------------------------------------------------------------------
-File Structure
+文件结构
 --------------------------------------------------------------------
 
 domagent/
-├── shared/                         # Extracted common code (was 3 copies)
-│   ├── utils.js                    #   escapeJS via JSON.stringify
-│   ├── overlay-styles.js           #   OVERLAY_CSS single source
-│   ├── content-script-lib.js       #   DOM ops: click/type/scan
-│   └── background-lib.js           #   Constants + isTabEligible
+├── shared/                         # 提取的公共代码（之前有3份拷贝）
+│   ├── utils.js                    #   escapeJS（JSON.stringify 实现）
+│   ├── overlay-styles.js           #   OVERLAY_CSS 唯一定义
+│   ├── content-script-lib.js       #   DOM 操作：click/type/scan
+│   └── background-lib.js           #   常量 + isTabEligible
 │
-├── domagent-mcp/                   # Node.js MCP server
-│   ├── index.js                    #   MCP entry point (stdio transport)
-│   ├── server.js                   #   BridgeServer (WS + CDP relay)
-│   └── package.json                #   deps: @modelcontextprotocol/sdk, ws
+├── domagent-mcp/                   # Node.js MCP 服务器
+│   ├── index.js                    #   MCP 入口（stdio 传输）
+│   ├── server.js                   #   BridgeServer（WS + CDP 中继）
+│   └── package.json                #   依赖：@modelcontextprotocol/sdk, ws
 │
 ├── domagent-extension/
-│   ├── chrome/                     # Chrome extension (MV3)
-│   │   ├── background.js           #   Service Worker (CDP via debugger API)
-│   │   ├── manifest.json           #   permissions: debugger, tabs, storage
-│   │   ├── options.html / .js      #   Settings UI
+│   ├── chrome/                     # Chrome 扩展（MV3）
+│   │   ├── background.js           #   Service Worker（CDP 通过 debugger API）
+│   │   ├── manifest.json           #   权限：debugger, tabs, storage
+│   │   ├── options.html / .js      #   设置界面
 │   │   └── icons/
-│   └── firefox/                    # Firefox extension (MV3)
-│       ├── background.js           #   Background script (content-script relay)
-│       ├── content.js              #   Thin message listener (81 lines)
-│       ├── manifest.json           #   loads shared/ via content_scripts
+│   └── firefox/                    # Firefox 扩展（MV3）
+│       ├── background.js           #   后台脚本（content-script 中继）
+│       ├── content.js              #   精简的消息监听器（81行）
+│       ├── manifest.json           #   通过 content_scripts 加载 shared/
 │       ├── options.html / .js
 │       └── icons/
 │
-└── .github/workflows/              # CI/CD (upstream)
+└── .github/workflows/              # CI/CD（上游）
 
 
 --------------------------------------------------------------------
-Layer 1: AI Agent <-> MCP Server (stdio)
+第1层：AI Agent ↔ MCP Server（stdio）
 --------------------------------------------------------------------
 
-The AI agent communicates with index.js via Model Context Protocol (MCP)
-over stdio. MCP is a JSON-RPC protocol.
+AI agent 通过 MCP 协议（Model Context Protocol）与 index.js 通信。
+MCP 是基于 JSON-RPC 的协议，走 stdio 通道。
 
-Protocol flow:
+协议流程：
 
-  Agent -> index.js:  { method: "tools/list" }
-  index.js -> Agent:  { tools: [navigate, click, type_text, ...] }
+  Agent → index.js:  { method: "tools/list" }
+  index.js → Agent:  { tools: [navigate, click, type_text, ...] }
 
-  Agent -> index.js:  { method: "tools/call", params: { name: "click",
+  Agent → index.js:  { method: "tools/call", params: { name: "click",
                         arguments: { selector: "#submit-btn" } } }
-  index.js -> Agent:  { content: [{ type: "text",
+  index.js → Agent:  { content: [{ type: "text",
                         text: "Clicked: #submit-btn" }] }
 
-index.js is a thin forwarding layer. Each tool call is dispatched to a
-corresponding method on BridgeServer (server.js). Nine tools are registered:
+index.js 只是一个薄转发层。每个 tool call 被分发到 BridgeServer（server.js）
+的对应方法。共注册 9 个工具：
 
-  Tool                          BridgeServer method     CDP command used
+  工具                           BridgeServer 方法     使用的 CDP 命令
   ────────────────────────────  ─────────────────────  ─────────────────
   navigate(url)                 navigate()             Browser.ensureTab
   use_current_tab()             useCurrentTab()        Browser.useCurrentTab
@@ -137,231 +137,224 @@ corresponding method on BridgeServer (server.js). Nine tools are registered:
 
 
 --------------------------------------------------------------------
-Layer 2: BridgeServer (server.js) — How Each Tool Works
+第2层：BridgeServer（server.js）— 各工具的实现原理
 --------------------------------------------------------------------
 
 navigate(url)
-  Sends CDP command "Browser.ensureTab" with the URL. The extension's
-  background.js creates (or reuses) a single dedicated automation tab.
-  The tab ID is persisted via chrome.storage.session to survive
-  Service Worker restarts.
+  发送 CDP 命令 "Browser.ensureTab" 带上目标 URL。扩展的 background.js
+  创建（或复用）一个专用的自动化标签页。标签页 ID 通过 chrome.storage.session
+  持久化，以应对 Service Worker 被系统杀死后重启的情况。
 
 click(selector)
-  Generates an IIFE JavaScript string that:
-    1. Finds the element via document.querySelector(selector)
-    2. Draws an orange pulsing highlight box + center dot
-    3. Dispatches MouseEvent sequence: pointerdown -> mousedown ->
-       pointerup -> mouseup -> click
-    4. Overlays auto-fade after ~1.7 seconds
-  The code string is executed via CDP Runtime.evaluate in the page context.
-  This approach works because most modern web apps listen for DOM events,
-  not raw OS-level input.
+  生成一个 IIFE（立即执行函数表达式）JavaScript 字符串：
+    1. 通过 document.querySelector(selector) 找到元素
+    2. 绘制橙色脉冲高亮框 + 中心圆点
+    3. 按顺序派发 MouseEvent：pointerdown → mousedown →
+       pointerup → mouseup → click
+    4. 覆盖层约 1.7 秒后自动淡出
+  这段代码字符串通过 CDP Runtime.evaluate 在页面上下文中执行。
+  之所以能工作，是因为大多数现代 Web 应用监听 DOM 事件而非底层系统输入。
 
 type_text(selector, text)
-  Same IIFE pattern as click, but:
-    1. Draws a green highlight box + blue dot
-    2. Sets el.value via the prototype setter (handles React/Vue bindings)
-    3. Dispatches 'input' and 'change' events
-  Using the prototype setter (Object.getOwnPropertyDescriptor) ensures
-  framework-managed inputs detect the value change.
+  与 click 相同的 IIFE 模式，但：
+    1. 绘制绿色高亮框 + 蓝色圆点
+    2. 通过原型 setter 设置 el.value（确保 React/Vue 能检测到变化）
+    3. 派发 'input' 和 'change' 事件
+  使用原型链的 setter（Object.getOwnPropertyDescriptor）能确保
+  框架管控的输入组件正确检测到值的变化。
 
 get_interactive_elements()
-  Scans the page DOM and returns up to 100 interactive elements
-  (buttons, links, inputs) + 150 text elements (headings, paragraphs).
-  Each element includes:
-    - index (number badge shown on overlay)
-    - tag, kind (click/type/text)
-    - text content (first 100 chars)
-    - CSS selector path
+  扫描页面 DOM，返回最多 100 个交互元素（按钮、链接、输入框）
+  + 150 个文本元素（标题、段落）。每个元素包含：
+    - index（覆盖层上显示的数字角标）
+    - tag、kind（click/type/text）
+    - text（截取前 100 字符）
+    - CSS 选择器路径
     - bounding box {x, y, w, h}
-  Draws colored overlay boxes that auto-fade after 4 seconds.
-  Color coding:
-    Yellow dashed = clickable (buttons, links)
-    Green dashed  = typeable (inputs, textareas, contenteditable)
-    Cyan solid    = text content (p, h1-h6, span, li, etc.)
+  绘制彩色覆盖框，4 秒后自动消失。
+  颜色编码：
+    黄色虚线 = 可点击（按钮、链接）
+    绿色虚线 = 可输入（input、textarea、contenteditable）
+    青色实线 = 文本内容（p、h1-h6、span、li 等）
 
 get_screenshot()
-  Uses CDP Page.captureScreenshot. Returns PNG as base64 string.
-  On Firefox: delegates to background.js tabs.captureVisibleTab()
-  (content scripts cannot capture the full viewport).
+  使用 CDP Page.captureScreenshot。返回 base64 PNG。
+  Firefox 上：委托给 background.js 的 tabs.captureVisibleTab()
+  （content script 无法截取完整视口）。
 
 
 --------------------------------------------------------------------
-Layer 3: WebSocket Bridge + Authentication + Rate Limiting
+第3层：WebSocket 桥接 + 认证 + 速率限制
 --------------------------------------------------------------------
 
-The MCP server and browser extension communicate over a local WebSocket
-at ws://127.0.0.1:18792/extension.
+MCP 服务器和浏览器扩展通过本地 WebSocket 通信：
+ws://127.0.0.1:18792/extension。
 
-Auth Handshake (Oracle finding #3 fix):
+认证握手（Oracle 审计第3项修复）：
 
-  Extension                              Server
-     |                                      |
-     |---- WS connect -------------------->|
-     |                                      | 5s timeout starts
-     |<--- {method:"hello", tokenRequired}  |
-     |                                      |
-     |---- {method:"auth", token:"xxx"} -->|
-     |                                      | validate token
-     |<--- {result:"authenticated"} --------|
-     |                                      |
-     |<== forwardCDPCommand ===============>|  normal ops
+  扩展                                    服务器
+   │                                        │
+   │──── WS 连接 ─────────────────────────→│
+   │                                        │ 5秒超时开始计时
+   │←─── {method:"hello", tokenRequired} ──│
+   │                                        │
+   │──── {method:"auth", token:"xxx"} ────→│
+   │                                        │ 校验 token
+   │←─── {result:"authenticated"} ─────────│
+   │                                        │
+   │←═══ forwardCDPCommand ══════════════→│  正常通信
 
-- No token set -> tokenRequired: false -> skip auth (backward compatible)
-- Token set    -> both sides must match, or connection closed after 5s
-- Token source: DOMAGENT_TOKEN env var or --token CLI arg
-- Extension reads token from chrome.storage.local.auth_token
+- 未设 token → tokenRequired: false → 跳过认证（向后兼容）
+- 设置了 token → 双方必须匹配，5 秒内未认证则断开
+- token 来源：DOMAGENT_TOKEN 环境变量 或 --token CLI 参数
+- 扩展从 chrome.storage.local.auth_token 读取 token
 
-Rate Limiting (Oracle finding #7 fix):
+速率限制（Oracle 审计第7项修复）：
 
   BridgeServer.maxPending = 10
 
-  If pendingRequests.size >= 10, new sendCommand() calls throw:
-    "Too many pending requests (10 max). Wait for previous commands
-     to complete."
+  当 pendingRequests.size >= 10 时，新的 sendCommand() 调用会抛出错误，
+  错误信息会提示用户等待之前命令完成后再重试。
 
-  Pending requests are cleaned up on:
-    - Response received (by id)
-    - 30-second timeout per request
-    - WebSocket disconnect (all flushed)
-
-
---------------------------------------------------------------------
-Layer 4: Browser Extensions — Chrome vs Firefox
---------------------------------------------------------------------
-
-Chrome Extension (CDP path)
-  Uses chrome.debugger API to send raw Chrome DevTools Protocol commands
-  directly to the tab process. No content script injection needed.
-
-  Flow: background.js -> chrome.debugger.sendCommand({tabId}, method, params)
-                         -> CDP -> page process executes
-
-  Advantages:
-    - Full CDP access (Runtime, Page, Network, DOM domains)
-    - Not blocked by page CSP
-    - No navigator.webdriver flag
-  Caveat:
-    - Chrome shows "debugging" banner (can suppress with
-      --silent-debugger-extension-api flag)
-
-Firefox Extension (Content Script Relay path)
-  Firefox has no chrome.debugger API. Instead, commands are sent to a
-  content script that executes them in the page's isolated world.
-
-  Flow: background.js -> tabs.sendMessage(tabId, {method, params})
-                         -> content.js -> shared/content-script-lib.js
-                         -> page DOM
-
-  Advantages:
-    - No debug banner
-    - Works on Firefox 109+
-  Limitations:
-    - evaluate_script uses new Function() which can be blocked by
-      strict CSP (caught with clear error message)
-    - Screenshot requires background.js fallback
-
-Tab Management
-  Both browsers use a single dedicated automation tab. On first
-  navigate(), a new tab is created and pinned. Subsequent navigate()
-  calls reuse the same tab (navigate to new URL). use_current_tab()
-  adopts the user's currently focused tab as the automation target.
-  Tab ID is persisted via storage.session to survive Service Worker
-  restarts (Chrome MV3 kills SW after ~30s idle).
+  等待中的请求在以下情况被清理：
+    - 收到响应（按 id 匹配）
+    - 单次请求 30 秒超时
+    - WebSocket 断开（全部清空）
 
 
 --------------------------------------------------------------------
-Layer 5: Visual Overlay System
+第4层：浏览器扩展 — Chrome vs Firefox 的分岔
 --------------------------------------------------------------------
 
-get_interactive_elements() draws temporary overlay boxes:
+Chrome 扩展（CDP 路径）
+  使用 chrome.debugger API 直接向标签页进程发送原始 CDP 命令。
+  无需注入 content script。
 
-  Yellow dashed + red index badge  ->  Clickable (buttons, links, menus)
-  Green dashed + red index badge   ->  Typeable (inputs, textareas)
-  Cyan solid (50% opacity)         ->  Text content (headings, paragraphs)
+  流程：background.js → chrome.debugger.sendCommand({tabId}, method, params)
+                       → CDP → 页面进程执行
 
-Click and type actions draw additional indicators:
-  - Orange pulsing dot (click) — expands from center, fades in 650ms
-  - Blue pulsing dot (type) — expands from center, fades in 850ms
-  - Highlight box pulses 3 times, fades in 1.5-2s
+  优势：
+    - 完整的 CDP 访问（Runtime、Page、Network、DOM 域）
+    - 不被页面 CSP 拦截
+    - 不会产生 navigator.webdriver 标志
+  注意事项：
+    - Chrome 会显示调试横幅（可用 --silent-debugger-extension-api 标志关闭）
 
-All overlay elements use CSS class prefix __da-* with z-index 2147483640+
-(maximum safe z-index). Pointer-events: none ensures overlays don't
-interfere with user interaction.
+Firefox 扩展（Content Script 中继路径）
+  Firefox 没有 chrome.debugger API，改为通过 content script 在
+  页面的隔离世界中执行操作。
 
-The overlay CSS is defined once in shared/overlay-styles.js — previously
-it was duplicated in 3 separate files (~200 lines of duplicate CSS).
+  流程：background.js → tabs.sendMessage(tabId, {method, params})
+                       → content.js → shared/content-script-lib.js
+                       → 页面 DOM
 
+  优势：
+    - 无调试横幅
+    - 支持 Firefox 109+
+  限制：
+    - evaluate_script 使用 new Function()，严格 CSP 的页面会拦截
+      （已捕获并以明确错误信息提示）
+    - 截图需要 background.js 回退方案
 
---------------------------------------------------------------------
-Shared Library Design
---------------------------------------------------------------------
-
-shared/utils.js (25 lines)
-  escapeJS(str) — uses JSON.stringify for complete Unicode safety.
-  Handles U+2028/U+2029 that the old manual escape missed.
-  Returns a double-quoted JSON string. Callers use ${escapeJS(s)}
-  (not '${escapeJS(s)}') in template literals.
-
-shared/overlay-styles.js (66 lines)
-  OVERLAY_CSS — complete CSS for all overlay classes and animations.
-  Imported by server.js (ESM). The content script lib has its own
-  inline copy (DOMAGENT_OVERLAY_CSS) since browser content scripts
-  cannot import ESM modules without a bundler.
-
-shared/content-script-lib.js (301 lines)
-  Browser-only (plain JS, loaded via Firefox manifest content_scripts).
-  Functions: domAgentEnsureOverlayStyles, domAgentClearOverlays,
-  domAgentEvaluate, domAgentClickElement, domAgentTypeIntoElement,
-  domAgentGetText, domAgentGetInteractiveElements.
-  All prefixed with domAgent to avoid global namespace collisions.
-
-shared/background-lib.js (22 lines)
-  Shared constants (DEFAULT_HOST, DEFAULT_PORT, DEFAULT_PATH,
-  AUTOMATION_TAB_KEY, BADGE) and domAgentIsTabEligible().
-  Loaded by Chrome via importScripts(), by Firefox via manifest
-  background.scripts array.
+标签页管理
+  两个浏览器都使用单一专用自动化标签页。首次 navigate() 时创建新标签页并
+  固定。后续 navigate() 调用复用同一个标签页（导航到新 URL）。
+  use_current_tab() 将用户当前焦点标签页接管为自动化目标。
+  标签页 ID 通过 storage.session 持久化，以应对 Service Worker 重启
+  （Chrome MV3 在约 30 秒空闲后会杀死 SW）。
 
 
 --------------------------------------------------------------------
-Security Hardening (Oracle Audit — all 10 findings resolved)
+第5层：可视化覆盖层系统
 --------------------------------------------------------------------
 
-  #1  evaluate_script arbitrary JS          BY DESIGN (tool feature)
-  #2  escapeJS incomplete                   FIXED: JSON.stringify
-  #3  WebSocket unauthenticated             FIXED: pre-shared token handshake
-  #4  unused activeTab permission           FIXED: removed from manifest
-  #5  CSP configuration                     INFO: acceptable as-is
-  #6  data exfiltration risk                BY DESIGN (trusted agent model)
-  #7  no rate limiting                      FIXED: 10 concurrent cap + cleanup
-  #8  ws@8.18.0 vulnerability               FIXED: upgraded to >=8.20.1
-  #9  storage security                      INFO: no sensitive data stored
-  #10 Firefox eval CSP blocks               FIXED: caught with clear error msg
+get_interactive_elements() 会绘制临时覆盖框：
 
-See commit log for implementation details:
+  黄色虚线 + 红色编号角标  →  可点击元素（按钮、链接、菜单）
+  绿色虚线 + 红色编号角标  →  可输入元素（input、textarea）
+  青色实线（50% 透明）      →  文本内容（标题、段落）
+
+click 和 type 操作会绘制额外的指示器：
+  - 橙色脉冲圆点（点击）— 从中心扩散，650ms 后消失
+  - 蓝色脉冲圆点（输入）— 从中心扩散，850ms 后消失
+  - 高亮框脉冲 3 次，约 1.5-2 秒后消失
+
+所有覆盖层元素使用 CSS 类前缀 __da-*，z-index 为 2147483640+
+（安全的最大值）。pointer-events: none 确保覆盖层不会干扰用户操作。
+
+覆盖层 CSS 在 shared/overlay-styles.js 中唯一定义 ——
+重构前分散在 3 个独立文件中（约 200 行重复 CSS）。
+
+
+--------------------------------------------------------------------
+共享库设计
+--------------------------------------------------------------------
+
+shared/utils.js（25行）
+  escapeJS(str) — 使用 JSON.stringify 实现完整的 Unicode 安全。
+  正确处理了旧手动转义遗漏的 U+2028/U+2029 字符。
+  返回带双引号的 JSON 字符串。调用方在模板字符串中直接使用
+  ${escapeJS(s)}（而非 '${escapeJS(s)}'）。
+
+shared/overlay-styles.js（66行）
+  OVERLAY_CSS — 所有覆盖层 CSS 类和动画的完整定义。
+  被 server.js 以 ESM 方式 import。content script lib 有自己内联的
+  副本（DOMAGENT_OVERLAY_CSS），因为浏览器 content script 无法
+  在不使用打包工具的情况下 import ESM 模块。
+
+shared/content-script-lib.js（301行）
+  仅浏览器端使用（plain JS，通过 Firefox manifest 的 content_scripts 加载）。
+  函数列表：domAgentEnsureOverlayStyles、domAgentClearOverlays、
+  domAgentEvaluate、domAgentClickElement、domAgentTypeIntoElement、
+  domAgentGetText、domAgentGetInteractiveElements。
+  所有函数以 domAgent 为前缀，避免全局命名空间冲突。
+
+shared/background-lib.js（22行）
+  共享常量（DEFAULT_HOST、DEFAULT_PORT、DEFAULT_PATH、
+  AUTOMATION_TAB_KEY、BADGE）和 domAgentIsTabEligible()。
+  Chrome 通过 importScripts() 加载，Firefox 通过 manifest 的
+  background.scripts 数组加载。
+
+
+--------------------------------------------------------------------
+安全加固（Oracle 审计 — 全部 10 项已处理）
+--------------------------------------------------------------------
+
+  #1  evaluate_script 可执行任意 JS         BY DESIGN（工具特性）
+  #2  escapeJS 不完整                       ✅ 已修复：JSON.stringify
+  #3  WebSocket 无认证                      ✅ 已修复：预共享 token 握手
+  #4  未使用的 activeTab 权限                ✅ 已修复：从 manifest 移除
+  #5  CSP 配置                              INFO：当前配置可接受
+  #6  数据泄露风险                           BY DESIGN（受信 agent 模型）
+  #7  无速率限制                             ✅ 已修复：并发上限 10 + 清理
+  #8  ws@8.18.0 漏洞                        ✅ 已修复：升级至 >=8.20.1
+  #9  存储安全                              INFO：无敏感数据存储
+  #10 Firefox eval 被 CSP 阻断              ✅ 已修复：捕获并以明确错误提示
+
+详见 commit log：
   16ae100  init: DOMAgent fork — Flygent
   3f8e905  security: pre-shared token auth
   5552803  fix: rate limiting + Firefox CSP eval guard
 
 
 --------------------------------------------------------------------
-Usage
+使用方法
 --------------------------------------------------------------------
 
-  # Start MCP server (no auth)
+  # 启动 MCP 服务器（无认证）
   npx domagent
 
-  # Start MCP server (with auth)
+  # 启动 MCP 服务器（带认证）
   DOMAGENT_TOKEN=my-secret npx domagent
   node index.js --token my-secret
 
-  # Load extension
-  Chrome:  chrome://extensions -> Developer mode -> Load unpacked ->
-           select domagent-extension/chrome/
-  Firefox: about:debugging -> This Firefox -> Load Temporary Add-on ->
-           select domagent-extension/firefox/manifest.json
+  # 加载扩展
+  Chrome:  chrome://extensions → 开发者模式 → 加载已解压的扩展 →
+           选择 domagent-extension/chrome/
+  Firefox: about:debugging → 此 Firefox → 临时载入附加组件 →
+           选择 domagent-extension/firefox/manifest.json
 
-  # Configure AI agent (Claude Desktop example)
+  # 配置 AI agent（以 Claude Desktop 为例）
   {
     "mcpServers": {
       "flygent": {
