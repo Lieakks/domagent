@@ -1,18 +1,18 @@
 ---
-name: flygent
-description: AI agent skill for browser automation via Flygent. Teaches the agent how to use 9 browser control tools (navigate, click, type_text, screenshot, evaluate_script, etc.) to automate real browser tasks through Chrome DevTools Protocol. Works with any MCP-compatible client (Claude Desktop, Cursor, Hermes, OpenCode).
+name: domagent
+description: AI agent skill for browser automation via DOMAgent. Teaches the agent how to use 9 browser control tools (navigate, click, type_text, screenshot, evaluate_script, etc.) to automate real browser tasks through Chrome DevTools Protocol. Works with any MCP-compatible client (Claude Desktop, Cursor, Hermes, OpenCode).
 version: 0.2.0
-author: Flygent
+author: DOMAgent
 ---
 
-# Flygent — Browser Automation Skill
+# DOMAgent — Browser Automation Skill
 
-You have access to Flygent, a browser automation system that lets you control a real browser (Chrome or Firefox) through MCP tools. You are NOT using a headless browser — every action happens in the user's actual browser window with their real cookies and sessions intact.
+You have access to DOMAgent, a browser automation system that lets you control a real browser (Chrome or Firefox) through MCP tools. You are NOT using a headless browser — every action happens in the user's actual browser window with their real cookies and sessions intact.
 
 ## Architecture (what you need to know)
 
 ```
-You (AI Agent) ──stdio/MCP──→ Flygent Server (node index.js)
+You (AI Agent) ──stdio/MCP──→ DOMAgent Server (node index.js)
                                     │
                                     │ WebSocket (local only, port 18792)
                                     ▼
@@ -26,7 +26,7 @@ You (AI Agent) ──stdio/MCP──→ Flygent Server (node index.js)
                             Real Browser Tab
 ```
 
-The Flygent server runs as a subprocess (started by your MCP client). You don't need to start it manually. It communicates with the browser extension over a local WebSocket — nothing leaves the machine.
+The DOMAgent server runs as a subprocess (started by your MCP client). You don't need to start it manually. It communicates with the browser extension over a local WebSocket — nothing leaves the machine.
 
 ## Available Tools
 

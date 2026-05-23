@@ -1,4 +1,4 @@
-Flygent v0.2.0 — 架构设计与实现原理
+DOMAgent v0.2.0 — 架构设计与实现原理
 ========================================
 
 > DOMAgent fork — 重构并加固安全的浏览器 agent 扩展。
@@ -332,7 +332,7 @@ shared/background-lib.js（22行）
   #10 Firefox eval 被 CSP 阻断              ✅ 已修复：捕获并以明确错误提示
 
 详见 commit log：
-  16ae100  init: DOMAgent fork — Flygent
+  16ae100  init: DOMAgent fork — DOMAgent
   3f8e905  security: pre-shared token auth
   5552803  fix: rate limiting + Firefox CSP eval guard
 
@@ -357,7 +357,7 @@ shared/background-lib.js（22行）
   # 配置 AI agent（以 Claude Desktop 为例）
   {
     "mcpServers": {
-      "flygent": {
+      "domagent": {
         "command": "node",
         "args": ["/path/to/domagent-mcp/index.js", "--token", "my-secret"]
       }
