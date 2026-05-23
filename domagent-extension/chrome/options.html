@@ -138,6 +138,24 @@
       font-family: var(--mono);
     }
 
+    .lang-btn {
+      font-size: 10px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 3px 10px;
+      border-radius: 100px;
+      border: 1px solid var(--border-accent);
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all var(--transition);
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    .lang-btn:hover {
+      background: rgba(255, 90, 54, 0.2);
+    }
+
     /* ─── Status banner ─────────────────────────────────────────── */
     .status-banner {
       display: flex;
@@ -770,9 +788,10 @@
       </div>
       <div class="header-text">
         <h1>DOMAgent</h1>
-        <p>AI-powered browser automation via Chrome DevTools Protocol</p>
+        <p data-i18n="header.subtitle">AI-powered browser automation via Chrome DevTools Protocol</p>
       </div>
       <span class="version">v0.1.0</span>
+      <button id="lang-btn" class="lang-btn" data-i18n="lang.label">Language</button>
     </div>
 
     <div class="top-grid">
@@ -780,16 +799,16 @@
       <div class="status-banner" id="status-banner" data-state="checking">
         <div class="status-dot"></div>
         <div class="status-info">
-          <div class="status-title" id="status-title">Checking connection…</div>
-          <div class="status-detail" id="status-detail">Attempting to reach the bridge server</div>
+          <div class="status-title" id="status-title" data-i18n="status.checking">Checking connection…</div>
+          <div class="status-detail" id="status-detail" data-i18n="status.checking_detail">Attempting to reach the bridge server</div>
         </div>
-        <button class="status-action" id="btn-recheck">Recheck</button>
+        <button class="status-action" id="btn-recheck" data-i18n="status.recheck">Recheck</button>
       </div>
 
       <!-- MCP heartbeat row -->
       <div class="heartbeat-row" id="heartbeat-row">
         <div class="heartbeat-dot unknown" id="heartbeat-dot"></div>
-        <span class="heartbeat-label" id="heartbeat-label">MCP heartbeat: not checked yet</span>
+        <span class="heartbeat-label" id="heartbeat-label" data-i18n="heartbeat.not_checked">MCP heartbeat: not checked yet</span>
         <span class="heartbeat-latency" id="heartbeat-latency"></span>
       </div>
     </div>
@@ -800,33 +819,33 @@
       <div class="card">
         <div class="card-header">
           <div class="card-icon orange">⚡</div>
-          <div class="card-title">Connection Settings</div>
+          <div class="card-title" data-i18n="connection.title">Connection Settings</div>
         </div>
         <div class="card-body">
           <div class="form-grid">
             <div class="field">
-              <label for="host">Host</label>
+              <label for="host" data-i18n="host.label">Host</label>
               <input type="text" id="host" placeholder="127.0.0.1" value="127.0.0.1" />
             </div>
             <div class="field">
-              <label for="port">Port</label>
+              <label for="port" data-i18n="port.label">Port</label>
               <input type="number" id="port" placeholder="18792" />
             </div>
             <div class="field">
-              <label for="path">WS Path</label>
+              <label for="path" data-i18n="path.label">WS Path</label>
               <input type="text" id="path" placeholder="/extension" value="/extension" />
             </div>
           </div>
 
           <div class="endpoint">
-            <span class="endpoint-label">Endpoint</span>
+            <span class="endpoint-label" data-i18n="endpoint.label">Endpoint</span>
             <span class="endpoint-url" id="relay-url">ws://127.0.0.1:18792/extension</span>
           </div>
 
           <div class="actions">
-            <button class="btn btn-primary" id="save">Save Settings</button>
-            <button class="btn btn-secondary" id="reset">Reset Defaults</button>
-            <span class="save-status" id="save-status">✓ Saved</span>
+            <button class="btn btn-primary" id="save" data-i18n="save.btn">Save Settings</button>
+            <button class="btn btn-secondary" id="reset" data-i18n="reset.btn">Reset Defaults</button>
+            <span class="save-status" id="save-status" data-i18n="saved">✓ Saved</span>
           </div>
         </div>
       </div>
@@ -835,11 +854,10 @@
       <div class="card">
         <div class="card-header">
           <div class="card-icon" style="background:rgba(0,210,255,0.12)">🎨</div>
-          <div class="card-title">Overlay Settings</div>
+          <div class="card-title" data-i18n="overlay.title">Overlay Settings</div>
         </div>
         <div class="card-body">
-          <p style="margin-bottom:14px">Control which visual overlays appear when the AI scans the page. Adjust opacity
-            to see a live preview.</p>
+          <p style="margin-bottom:14px" data-i18n="overlay.desc">Control which visual overlays appear when the AI scans the page. Adjust opacity to see a live preview.</p>
 
           <!-- Click box toggle -->
           <div class="toggle-row" id="row-click">
@@ -848,7 +866,10 @@
               <span class="toggle-track"></span>
             </label>
             <div class="overlay-preview click-box" id="preview-click">Aa</div>
-            <div class="toggle-label">Click boxes<small>Yellow — buttons, links</small></div>
+            <div class="toggle-label">
+              <span data-i18n="click.label">Click boxes</span>
+              <small data-i18n="click.desc">Yellow — buttons, links</small>
+            </div>
             <div class="slider-group">
               <input type="range" id="overlay-click-opacity" min="10" max="100" value="75" />
               <span class="slider-value" id="val-click-opacity">75%</span>
@@ -862,7 +883,10 @@
               <span class="toggle-track"></span>
             </label>
             <div class="overlay-preview type-box" id="preview-type">Aa</div>
-            <div class="toggle-label">Type boxes<small>Green — inputs, textareas</small></div>
+            <div class="toggle-label">
+              <span data-i18n="type.label">Type boxes</span>
+              <small data-i18n="type.desc">Green — inputs, textareas</small>
+            </div>
             <div class="slider-group">
               <input type="range" id="overlay-type-opacity" min="10" max="100" value="75" />
               <span class="slider-value" id="val-type-opacity">75%</span>
@@ -876,7 +900,10 @@
               <span class="toggle-track"></span>
             </label>
             <div class="overlay-preview text-box" id="preview-text">Aa</div>
-            <div class="toggle-label">Text boxes<small>Cyan — paragraphs, headings</small></div>
+            <div class="toggle-label">
+              <span data-i18n="text.label">Text boxes</span>
+              <small data-i18n="text.desc">Cyan — paragraphs, headings</small>
+            </div>
             <div class="slider-group">
               <input type="range" id="overlay-text-opacity" min="10" max="100" value="50" />
               <span class="slider-value" id="val-text-opacity">50%</span>
@@ -889,33 +916,32 @@
       <div class="card quick-start">
         <div class="card-header">
           <div class="card-icon blue">🚀</div>
-          <div class="card-title">Quick Start</div>
+          <div class="card-title" data-i18n="quickstart.title">Quick Start</div>
         </div>
         <div class="card-body">
           <div class="steps">
             <div class="step">
               <div class="step-num">1</div>
               <div class="step-content">
-                Start your MCP server: <code>cd ollama-plugin && npm start</code>
+                <span data-i18n-html="step1"></span> <code>cd domagent-mcp && npm start</code>
               </div>
             </div>
             <div class="step">
               <div class="step-num">2</div>
               <div class="step-content">
-                The extension auto-connects. Check the status banner above — it should turn <strong>green</strong>.
+                <span data-i18n-html="step2"></span> <strong data-i18n="step2_green">green</strong>.
               </div>
             </div>
             <div class="step">
               <div class="step-num">3</div>
               <div class="step-content">
-                Configure your AI agent (Claude, Ollama, etc.) to use the MCP server via <strong>stdio
-                  transport</strong>.
+                <span data-i18n-html="step3"></span> <strong data-i18n="step3_transport">stdio transport</strong>.
               </div>
             </div>
             <div class="step">
               <div class="step-num">4</div>
               <div class="step-content">
-                To hide the debug banner, launch Chrome with: <code>--silent-debugger-extension-api</code>
+                <span data-i18n-html="step4"></span> <code>--silent-debugger-extension-api</code>
               </div>
             </div>
           </div>
@@ -926,8 +952,8 @@
 
     <!-- Footer -->
     <div class="footer">
-      <span>DOMAgent — Built for AI automation</span>
-      <a href="https://github.com" target="_blank" rel="noopener">GitHub ↗</a>
+      <span data-i18n="footer.text">DOMAgent — Built for AI automation</span>
+      <a href="https://github.com/vaishnavucv/domagent" target="_blank" rel="noopener" data-i18n="footer.github">GitHub ↗</a>
     </div>
 
   </div>
